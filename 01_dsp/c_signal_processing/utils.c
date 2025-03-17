@@ -242,20 +242,34 @@ double calculateSNR(double complex *captureFT, int numOfSamplers, int freqTag, i
 
     int noiseFreqLowBound;
     int noiseFreqHighBound;
-    noiseFreqLowBound = (int)freqTag * 0.945;
-    noiseFreqHighBound = (int)freqTag * 0.955;
+    noiseFreqLowBound = (int)(freqTag * 0.945);
+    noiseFreqHighBound = (int)(freqTag * 0.955);
 
-    double noiseMag;
-    noiseMag = 0;
-    for (int j = noiseFreqLowBound; j < noiseFreqHighBound; j++) {
-        noiseMag += cabs(captureFT[peakBin + numOfSamplers * (j-1)]);
+
+    if (noiseFreqLowBound < 1) noiseFreqLowBound = 1;
+    if (noiseFreqHighBound > numOfSamplers) noiseFreqHighBound = numOfSamplers;
+
+    double noiseMag = 0.0;
+    int noiseCount = 0;
+    for (int j = noiseFreqLowBound; j <= noiseFreqHighBound; j++) {
+        if (j == freqTag) continue;  // Skip the signal frequency
+        
+        int idx = peakBin + numOfSamplers * (j - 1);
+        if (idx >= 0 && idx < numOfSamplers * freqTag) {
+            noiseMag += cabs(captureFT[idx]);
+            noiseCount++;
+        }
     }
 
-    noiseMag = noiseMag / (noiseFreqHighBound - noiseFreqLowBound);
+    // Avoid division by zero
+    // int noiseCount = noiseFreqHighBound - noiseFreqLowBound;
+    if (noiseCount == 0 || noiseMag <= 0.0) return 0.0;
+    
+    // Calculate average noise
+    noiseMag /= noiseCount;
 
-    double SNR;
-    SNR = signalMag / noiseMag;
-    return (10 * log10(SNR));
+    double SNR = signalMag / noiseMag;
+    return (10.0 * log10(SNR));
 }
 
 /**

@@ -409,6 +409,7 @@ void wadar2dirtviz(const char *url, double vwc)
 
 #define WADAR_TEST
 #ifdef WADAR_TEST
+#ifndef TESTING
 int main(int argc, char *argv[])
 {
     if (argc < 2)
@@ -624,6 +625,7 @@ int main(int argc, char *argv[])
     printf("Usage: %s wadarTwoTag -s <fullDataPath> -t <trialName> -f <tag1Hz> -g <tag2Hz> -c <frameCount> -n <captureCount> -d <tagDiff>\n", argv[0]);
     return -1;
 }
+#endif
 #endif
 
 // #define DIRTVIZ_TEST
