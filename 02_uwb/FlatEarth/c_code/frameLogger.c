@@ -131,6 +131,9 @@
 // Novelda radar API include
 #include "Radarlib3.h"
 
+// Add these includes at the top of the file after existing includes
+#include "../../../01_dsp/c_signal_processing/proc.h"
+
 #define CLOCKID CLOCK_REALTIME
 
 // -----------------------------------------------------------------------------
@@ -168,6 +171,32 @@
 void Usage();
 void LEDHelper(int radarSpecifier, SalsaLED led, int value);
 
+
+void processDspFrame(uint32_t* frame, struct DspConfig* dspConfig) {
+    CaptureData* captureData = procRadarFrames(frame, numberOfSamplers, dspConfig->tagFrequency);
+    
+    if (captureData->procSuccess) {
+        // Calculate soil moisture if we have the air reference
+        if (dspConfig->airPeakBin > 0) {
+            double vwc = procSoilMoisture(
+                captureData->peakBin,
+                dspConfig->airPeakBin,
+                dspConfig->soilType,
+                dspConfig->distance
+            );
+            printf("Volumetric Water Content: %.2f%%\n", vwc * 100);
+        }
+        
+        // Store the peak bin as air reference if needed
+        else {
+            dspConfig->airPeakBin = captureData->peakBin;
+            printf("Air reference measurement stored: %.2f\n", dspConfig->airPeakBin);
+        }
+    }
+    
+    freeCaptureData(captureData);
+}
+
 // -----------------------------------------------------------------------------
 // Variables
 // -----------------------------------------------------------------------------
@@ -187,6 +216,15 @@ static double *timedelta;
 // Additional signals?
 // Additional signals?
 
+// Add these new parameters to store DSP-related settings
+struct DspConfig {
+    bool enableDsp;
+    double tagFrequency;
+    char* soilType;
+    double distance;
+    double airPeakBin;  // Reference measurement
+};
+
 // -----------------------------------------------------------------------------
 // Utility Functions
 // -----------------------------------------------------------------------------
@@ -204,6 +242,10 @@ void Usage()
   printf(" %-c %-18s - %-40s\n", 'f', "[framerate]", "Specify framerate");
   printf(" %-c %-18s - %-40s\n", 't', "[type]", "Specify radar type, Ancho, Cayenne, or Chipotle");
   printf(" -%c %-18s - %-40s\n", 'c', "[copyPath]", "Directory on computer to transfer the files to");
+  printf(" -%c %-18s - %-40s\n", 'p', "", "Enable DSP processing");
+  printf(" -%c %-18s - %-40s\n", 'f', "[frequency]", "Tag frequency in Hz");
+  printf(" -%c %-18s - %-40s\n", 'y', "[soil type]", "Soil type (farm, stanfordFarm, etc)");
+  printf(" -%c %-18s - %-40s\n", 'm', "[distance]", "Distance to tag in meters");
 }
 
 void LEDHelper(int radarSpecifier, SalsaLED led, int value)
@@ -300,6 +342,9 @@ int main(int argc, char **argv)
   //type of radar
   int radarSpecifier = -1; //2 for X2, 10 for X1-Cayenne, 11 for X1-Chipotle
 
+  // DSP configuration
+  struct DspConfig dspConfig = {false, 0.0, NULL, 0.0, 0.0};
+
   // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -307,7 +352,7 @@ int main(int argc, char **argv)
   // Process command-line arguments
   //
 
-  while ((c = getopt(argc, argv, "gs:l:n:d:r:f:t:c:")) != -1) {
+  while ((c = getopt(argc, argv, "gs:l:n:d:r:f:t:c:p:fr:y:m:")) != -1) {
     switch (c) {
 
     /* Enable Gnuplot of radar data */
@@ -390,6 +435,26 @@ int main(int argc, char **argv)
 
     case 'c':
       copyPath = optarg;
+      break;
+
+    // Enable DSP processing
+    case 'p':
+      dspConfig.enableDsp = true;
+      break;
+
+    // Tag frequency
+    case 'fr':
+      dspConfig.tagFrequency = atof(optarg);
+      break;
+
+    // Soil type
+    case 'y':
+      dspConfig.soilType = optarg;
+      break;
+
+    // Distance in meters
+    case 'm':
+      dspConfig.distance = atof(optarg);
       break;
 
     default:
@@ -601,6 +666,12 @@ int main(int argc, char **argv)
         fclose(dataLog);
         return 1;
       }
+
+      // Process DSP frame if enabled
+      if (dspConfig.enableDsp) {
+        processDspFrame(radarFrames+t*numberOfSamplers, &dspConfig);
+      }
+
       // Read the current temperature
       //isAncho ? anchoHelper_readTemp(&temperature) : cayenneHelper_readTemp(&temperature);
 
