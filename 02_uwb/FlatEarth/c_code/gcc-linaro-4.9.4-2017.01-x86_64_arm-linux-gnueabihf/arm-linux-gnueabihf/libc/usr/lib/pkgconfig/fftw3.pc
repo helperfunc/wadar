@@ -1,0 +1,11 @@
+prefix=/home/huixu3/wadar/02_uwb/FlatEarth/c_code/gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabihf/bin/../arm-linux-gnueabihf/libc/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: FFTW
+Description: fast Fourier transform library
+Version: 3.3.10
+Libs: -L${libdir} -lfftw3 
+Libs.private: -lm
+Cflags: -I${includedir}
